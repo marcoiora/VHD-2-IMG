@@ -84,20 +84,20 @@ static int verbose = 1;
 
 struct VHD_footer {
     char cookie[8];
-    unsigned long features;
-    unsigned long version;
-    unsigned long long dataOffset;
-    unsigned long timeStamp;
+    unsigned int features;
+    unsigned int version;
+    unsigned long dataOffset;
+    unsigned int timeStamp;
     char creatorApplication[4];
-    unsigned long creatorVersion;
+    unsigned int creatorVersion;
     char creatorOS[4];
-    unsigned long long originalSize;
-    unsigned long long currentSize;
+    unsigned long originalSize;
+    unsigned long currentSize;
     unsigned short cylinders;
     unsigned char heads;
     unsigned char sectors;
-    unsigned long diskType;
-    unsigned long checksum;
+    unsigned int diskType;
+    unsigned int checksum;
     unsigned char uniqueId[16];
     unsigned char savedState;
     unsigned char padding[427];
@@ -105,35 +105,35 @@ struct VHD_footer {
 
 struct VHD_dynamic {
     char cookie[8];
-    unsigned long long dataOffset;
-    unsigned long long tableOffset;
-    unsigned long headerVersion;
-    unsigned long maxTableEntries;
-    unsigned long blockSize;
-    unsigned long checksum;
+    unsigned long dataOffset;
+    unsigned long tableOffset;
+    unsigned int headerVersion;
+    unsigned int maxTableEntries;
+    unsigned int blockSize;
+    unsigned int checksum;
     unsigned char parentUniqueId[16];
-    unsigned long parentTimeStamp;
-    unsigned long reserved1;
+    unsigned int parentTimeStamp;
+    unsigned int reserved1;
     unsigned char parentUnicodeName[512];
     struct {
 	unsigned char platformCode[4];
-	unsigned long platformDataSpace;
-	unsigned long platformDataLength;
-	unsigned long reserved;
-	unsigned long long platformDataOffset;
+	unsigned int platformDataSpace;
+	unsigned int platformDataLength;
+	unsigned int reserved;
+	unsigned long platformDataOffset;
     } __attribute__((__packed__)) partentLocator[8];
     unsigned char reserved2[256];
 } __attribute__((__packed__));
 
 /*
-** network byte order to host, "double" i.e. long long
+** network byte order to host, "double" i.e. long
 */
-static unsigned long long ntohd( unsigned long long v)
+static unsigned long ntohd( unsigned long v)
 {
     if ( htons(1) == 1) return v;
     else {
-	return (unsigned long long)ntohl( v&0x00000000ffffffff) << 32 | 
-	    (unsigned long long)ntohl( (v>>32)&0x00000000ffffffff);
+	return (unsigned long)ntohl( v&0x00000000ffffffff) << 32 | 
+	    (unsigned long)ntohl( (v>>32)&0x00000000ffffffff);
     }
 }
 
@@ -145,13 +145,13 @@ static void dump_footer(struct VHD_footer *footer)
     fprintf(stderr,"%24s : '%8.8s'\n", "cookie", footer->cookie);
     fprintf(stderr,"%24s : %08x\n", "features", ntohl(footer->features));
     fprintf(stderr,"%24s : %08x\n", "version", ntohl(footer->version));
-    fprintf(stderr,"%24s : %016llx\n", "data offset", ntohd(footer->dataOffset));
+    fprintf(stderr,"%24s : %016lx\n", "data offset", ntohd(footer->dataOffset));
     fprintf(stderr,"%24s : %08x\n", "time stamp", ntohl(footer->timeStamp));
     fprintf(stderr,"%24s : '%4.4s'\n", "creator application", footer->creatorApplication);
     fprintf(stderr,"%24s : %08x\n", "creator version", ntohl(footer->creatorVersion));
     fprintf(stderr,"%24s : '%4.4s'\n", "creator os", footer->creatorOS);
-    fprintf(stderr,"%24s : %016llx\n", "original size", ntohd(footer->originalSize));
-    fprintf(stderr,"%24s : %016llx\n", "current size", ntohd(footer->currentSize));
+    fprintf(stderr,"%24s : %016lx\n", "original size", ntohd(footer->originalSize));
+    fprintf(stderr,"%24s : %016lx\n", "current size", ntohd(footer->currentSize));
     fprintf(stderr,"%24s : %d\n", "cylinders", ntohs(footer->cylinders));
     fprintf(stderr,"%24s : %d\n", "heads", footer->heads);
     fprintf(stderr,"%24s : %d\n", "sectors", footer->sectors);
@@ -172,8 +172,8 @@ static void dump_dynamic(struct VHD_dynamic *dynamic)
 
     fprintf(stderr,"==================== VHD Dynamic =====================\n");
     fprintf(stderr,"%24s : '%8.8s'\n", "cookie", dynamic->cookie);
-    fprintf(stderr,"%24s : %016llx\n", "data offset", ntohd(dynamic->dataOffset));
-    fprintf(stderr,"%24s : %016llx\n", "table offset", ntohd(dynamic->tableOffset));
+    fprintf(stderr,"%24s : %016lx\n", "data offset", ntohd(dynamic->dataOffset));
+    fprintf(stderr,"%24s : %016lx\n", "table offset", ntohd(dynamic->tableOffset));
     fprintf(stderr,"%24s : %08x\n", "version", ntohl(dynamic->headerVersion));
     fprintf(stderr,"%24s : %d\n", "max table entries", ntohl(dynamic->maxTableEntries));
     fprintf(stderr,"%24s : %d\n", "block size", ntohl(dynamic->blockSize));
@@ -211,7 +211,7 @@ int main( int argc, char **argv)
 	exit(1);
     }
 
-    FILE *out = fopen(argv[2],"wb");
+    FILE *out = fopen(argv[2],"rb+");
     if ( !out) {
 	fprintf(stderr,"Failed to open output file '%s': %s\n", argv[1], strerror(errno));
 	exit(1);
@@ -240,9 +240,6 @@ int main( int argc, char **argv)
     if ( verbose) dump_footer(&footer);
     
     switch(htonl(footer.diskType)) {
-      case 4:
-	fprintf(stderr,"Differencing VHDs not supported.\n");
-	exit(1);
       case 2:
 	/*
 	** Warning: untested code. I don't have one of these files.
@@ -266,9 +263,10 @@ int main( int argc, char **argv)
 		    exit(1);
 		}
 	    }
-	    fprintf(stderr,"Completed. %lld bytes written.\n", (long long)footerOffset);
+	    fprintf(stderr,"Completed. %ld bytes written.\n", (long)footerOffset);
 	    return 0;
 	}
+	  case 4:
       case 3:
 	if ( verbose) fprintf(stderr,"Processing dynamic VHD...\n");
 	break;
@@ -303,8 +301,8 @@ int main( int argc, char **argv)
 	exit(1);
     }
     
-    unsigned long bats = ntohl( dynamic.maxTableEntries);
-    unsigned long *bat = calloc( sizeof(*bat) , bats);
+    unsigned int bats = ntohl( dynamic.maxTableEntries);
+    unsigned int *bat = calloc( sizeof(*bat) , bats);
     if ( fread( bat, sizeof(*bat), bats, in) != bats) {
 	fprintf(stderr,"Failed to read block allocation table: %s\n", strerror(errno));
 	exit(1);
@@ -321,9 +319,9 @@ int main( int argc, char **argv)
     }
 
     unsigned int b;
-    unsigned long emptySectors = 0;
-    unsigned long usedSectors = 0;
-    unsigned long usedZeroes = 0;
+    unsigned int emptySectors = 0;
+    unsigned int usedSectors = 0;
+    unsigned int usedZeroes = 0;
     char buf[512];
 
     for ( b = 0; b < bats; b++) {
@@ -332,7 +330,7 @@ int main( int argc, char **argv)
 	    continue;      /* totally empty block */
 	}
 
-	unsigned long long bo = ntohl(bat[b])*512LL;
+	unsigned long bo = ntohl(bat[b])*512LL;
 
 	if ( bo > footerOffset) {
 	    fprintf(stderr,"Bad block offset\n");
@@ -343,12 +341,12 @@ int main( int argc, char **argv)
 	    exit(1);
 	}
 	if ( fread( bitmap, 512*blockBitmapSectorCount, 1, in) != 1) {
-	    fprintf(stderr,"Failed to read block bitmap(%lld): %s\n", bo, strerror(errno));
+	    fprintf(stderr,"Failed to read block bitmap(%ld): %s\n", bo, strerror(errno));
 	    exit(1);
 	}
 
 	unsigned int s,k;
-	unsigned long long opos = 0xffffffffffffffffLL;
+	unsigned long opos = 0xffffffffffffffffLL;
 
 	if ( fseeko(in, bo+512*blockBitmapSectorCount, SEEK_SET) != 0) {
 	    fprintf(stderr,"Failed to seek to input sectors: %s\n", strerror(errno));
@@ -378,10 +376,10 @@ int main( int argc, char **argv)
 		if ( empty) {
 		    usedZeroes++;
 		} else {
-		    unsigned long long pos = (b*sectorsPerBlock + s) * 512LL;
+		    unsigned long pos = (b*sectorsPerBlock + s) * 512LL;
 		    if ( pos != opos) {
 			if ( fseeko( out, pos, SEEK_SET) != 0) {
-			    fprintf(stderr,"Failed to seek output file for sector %lld (block %d of %lu,sector %d of %d): %s\n", 
+			    fprintf(stderr,"Failed to seek output file for sector %lld (block %d of %u,sector %d of %d): %s\n", 
 				    (b*sectorsPerBlock + s) * 512LL, b,bats,s,sectorsPerBlock,
 				    strerror(errno));
 			    exit(1);
